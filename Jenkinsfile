@@ -2,16 +2,32 @@ pipeline {
     agent any
 
     stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
         stage('Build') {
             steps {
                 bat 'cargo build --release'
             }
         }
 
-        stage('Run') {
+        stage('Test') {
             steps {
-                bat 'target\\release\\my_rust_app.exe'
+                bat 'cargo test'
             }
+        }
+    }
+
+    post {
+        success {
+            echo 'Build successful 🎉'
+        }
+        failure {
+            echo 'Build failed ❌'
         }
     }
 }
