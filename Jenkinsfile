@@ -1,16 +1,18 @@
 pipeline {
     agent any
 
-    stages {
-		stage('Test Cargo') {
-			steps {
-				bat 'cargo --version'
-			}
-		}
+    environment {
+        PATH = "C:\\Users\\arshn\\.cargo\\bin;${env.PATH}"
+        RUSTUP_TOOLCHAIN = "stable"
+    }
 
-        stage('Checkout') {
+    stages {
+        stage('Debug Rust') {
             steps {
-                checkout scm
+                bat 'where rustc'
+                bat 'where cargo'
+                bat 'rustc --version'
+                bat 'cargo --version'
             }
         }
 
