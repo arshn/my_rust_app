@@ -1,12 +1,17 @@
 pipeline {
     agent any
 
+    environment {
+        // مهم: System32 حتما باید باشه
+        PATH = "C:\\Windows\\System32;C:\\Users\\arshn\\.cargo\\bin;${env.PATH}"
+    }
+
     stages {
 
-        stage('Fix PATH') {
+        stage('Fix Rust Toolchain') {
             steps {
                 bat '''
-                set PATH=C:\\Windows\\System32;C:\\Windows;C:\\Users\\arshn\\.cargo\\bin;%PATH%
+                rustup default stable
                 '''
             }
         }
@@ -17,15 +22,10 @@ pipeline {
                 where cmd
                 where cargo
                 where rustc
+
                 cargo --version
                 rustc --version
                 '''
-            }
-        }
-
-        stage('Fix Rust Toolchain') {
-            steps {
-                bat 'rustup default stable'
             }
         }
 
