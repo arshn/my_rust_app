@@ -2,20 +2,24 @@ pipeline {
     agent any
 
     environment {
-        PATH = "C:\\Users\\arshn\\.cargo\\bin;C:\\Program Files\\Git\\bin;C:\\Windows\\System32"
+        CARGO_HOME = "C:\\Users\\arshn\\.cargo"
+        PATH = "C:\\Users\\arshn\\.cargo\\bin;C:\\Program Files\\Git\\cmd;C:\\Windows\\System32"
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Check Rust') {
+        stage('Rust Check') {
             steps {
-                bat 'rustc --version'
+                bat 'where cargo'
+                bat 'where rustc'
                 bat 'cargo --version'
+                bat 'rustc --version'
             }
         }
 
@@ -29,6 +33,15 @@ pipeline {
             steps {
                 bat 'cargo test'
             }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Build successful'
+        }
+        failure {
+            echo '❌ Build failed'
         }
     }
 }
