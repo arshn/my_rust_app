@@ -2,16 +2,18 @@ pipeline {
     agent any
 
     environment {
-        PATH = "C:\\Users\\arshn\\.cargo\\bin;${env.PATH}"
-        RUSTUP_TOOLCHAIN = "stable"
-        CARGO_HOME = "C:\\Users\\arshn\\.cargo"
-        RUSTUP_HOME = "C:\\Users\\arshn\\.rustup"
+        PATH = "C:\\Users\\arshn\\.cargo\\bin;C:\\Program Files\\Git\\bin;C:\\Windows\\System32"
     }
 
     stages {
-        stage('Debug Rust') {
+        stage('Checkout') {
             steps {
-                bat 'rustup show'
+                checkout scm
+            }
+        }
+
+        stage('Check Rust') {
+            steps {
                 bat 'rustc --version'
                 bat 'cargo --version'
             }
@@ -20,6 +22,12 @@ pipeline {
         stage('Build') {
             steps {
                 bat 'cargo build --release'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                bat 'cargo test'
             }
         }
     }
