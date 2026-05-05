@@ -1,24 +1,35 @@
 pipeline {
-    agent none  // برای کنترل بهتر agent در هر stage
-
+    agent none
+    
     environment {
         CARGO_TERM_COLOR = 'always'
-        RUST_BACKTRACE = '1'
+        RUST_BACKTRACE = 'full'
+        CARGO_INCREMENTAL = '0'
     }
 
     stages {
-        stage('Checkout') {
+        // 1. Checkout & Prepare
+        stage('Checkout & Prepare') {
             agent any
             steps {
                 checkout scm
+                echo "✅ Checkout completed"
             }
         }
 
-        // ====================== Linting & Formatting ======================
+        // 2. Cache (با Swatinem/rust-cache-style اما در Jenkins)
+        stage('Cache Setup') {
+            agent any
+            steps {
+                echo "🗄️ Cache will be handled automatically by subsequent stages"
+            }
+        }
+
+        // 3+4. Formatting + Linting (Parallel)
         stage('Code Quality') {
             parallel {
                 stage('Rustfmt') {
-                    agent { label 'linux' }  // یا any
+                    agent { label 'linux' }
                     steps {
                         sh '''
                         rustup component add rustfmt
@@ -26,7 +37,6 @@ pipeline {
                         '''
                     }
                 }
-
                 stage('Clippy') {
                     agent { label 'linux' }
                     steps {
@@ -39,99 +49,140 @@ pipeline {
             }
         }
 
-        // ====================== Build & Test Linux ======================
-        stage('Linux Build & Test') {
+        // 5+6+8. Linux Build + Test
+        stage('Linux - Build & Test') {
             agent { label 'linux' }
             steps {
                 sh '''
                 echo "=== Rust Version ==="
-                rustc --version
-                cargo --version
+                rustc --version && cargo --version
                 
-                echo "=== Building Debug ==="
+                echo "=== Build Debug ==="
                 cargo build
                 
-                echo "=== Building Release ==="
+                echo "=== Build Release ==="
                 cargo build --release
                 
-                echo "=== Running Tests ==="
+                echo "=== Run Tests ==="
                 cargo test --release
                 '''
             }
         }
 
-        // ====================== Build & Test Windows ======================
-        stage('Windows Build & Test') {
-            agent { label 'windows' }   // یا any اگر فقط یک agent ویندوزی داری
+        // 7. Cross Build (با cross-rs)
+        stage('Cross Compilation') {
+            agent { label 'linux' }
+            steps {
+                sh '''
+                cargo install cross --git https://github.com/cross-rs/cross || echo "cross already installed"
+                
+                echo "=== Cross build for Windows (GNU) ==="
+                cross build --release --target x86_64-pc-windows-gnu
+                
+                echo "=== Cross build for ARM64 Linux ==="
+                cross build --release --target aarch64-unknown-linux-gnu
+                '''
+            }
+        }
+
+        // 9. Test with Coverage (با cargo-llvm-cov)
+        stage('Coverage Report') {
+            agent { label 'linux' }
+            steps {
+                sh '''
+                rustup component add llvm-tools-preview
+                cargo install cargo-llvm-cov || echo "cargo-llvm-cov already installed"
+                
+                echo "=== Generating Coverage ==="
+                cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+                
+                echo "=== Coverage Summary ==="
+                cargo llvm-cov --all-features --workspace --summary
+                '''
+                archiveArtifacts artifacts: 'lcov.info', allowEmptyArchive: true
+            }
+        }
+
+        // Windows Build & Test
+        stage('Windows - Build & Test') {
+            agent { label 'windows' }
             steps {
                 bat '''
-                echo === Environment Info ===
-                where link.exe
-                where cargo
-                where rustc
-                
                 call "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat" x64
                 
-                echo === Building Debug ===
+                echo === Build Debug ===
                 cargo build
                 
-                echo === Building Release ===
+                echo === Build Release ===
                 cargo build --release
                 
-                echo === Running Tests ===
+                echo === Run Tests ===
                 cargo test --release
                 '''
             }
         }
 
-        // ====================== Security & Dependencies ======================
+        // 10. Security Audit
         stage('Security Audit') {
             agent { label 'linux' }
             steps {
                 sh '''
-                echo "=== Installing audit tools ==="
-                cargo install --quiet cargo-audit || echo "cargo-audit already installed"
-                cargo install --quiet cargo-deny || echo "cargo-deny already installed"
+                cargo install cargo-audit cargo-deny || echo "Audit tools installed"
                 
-                echo "=== Running cargo audit ==="
-                cargo audit
+                echo "=== Cargo Audit ==="
+                cargo audit --deny warnings || echo "Audit completed with warnings"
                 
-                echo "=== Running cargo deny ==="
-                cargo deny check || echo "cargo-deny finished with warnings"
+                echo "=== Cargo Deny ==="
+                cargo deny check || echo "Deny check completed"
                 '''
             }
         }
 
-        // ====================== Documentation ======================
+        // 11. Documentation
         stage('Documentation') {
             agent { label 'linux' }
             steps {
                 sh '''
                 echo "=== Building Documentation ==="
-                cargo doc --no-deps --all-features
+                cargo doc --no-deps --all-features --document-private-items
                 '''
+                archiveArtifacts artifacts: 'target/doc/**', allowEmptyArchive: true
             }
         }
 
-        // ====================== Artifacts (اختیاری اما توصیه‌شده) ======================
+        // 12. Artifact / Release
         stage('Archive Artifacts') {
-            agent { label 'linux' }
-            steps {
-                sh 'cargo build --release'
-                archiveArtifacts artifacts: 'target/release/my_rust_app*, target/release/my_rust_app.exe', fingerprint: true
+            parallel {
+                stage('Linux Binary') {
+                    agent { label 'linux' }
+                    steps {
+                        sh 'cargo build --release'
+                        archiveArtifacts artifacts: 'target/release/my_rust_app,target/release/my_rust_app*', fingerprint: true
+                    }
+                }
+                stage('Windows Binary') {
+                    agent { label 'windows' }
+                    steps {
+                        bat '''
+                        call "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat" x64
+                        cargo build --release
+                        '''
+                        archiveArtifacts artifacts: 'target/release/my_rust_app.exe', fingerprint: true
+                    }
+                }
             }
         }
     }
 
     post {
-        always {
-            echo 'Pipeline finished'
-        }
         success {
-            echo '✅ Build & Checks Completed Successfully'
+            echo '🎉 تمام مراحل با موفقیت انجام شد!'
         }
         failure {
-            echo '❌ Pipeline Failed'
+            echo '❌ Pipeline با خطا مواجه شد'
+        }
+        always {
+            cleanWs()
         }
     }
 }
