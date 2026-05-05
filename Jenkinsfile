@@ -11,6 +11,7 @@ pipeline {
             steps {
                 bat '''
                 echo PATH=%PATH%
+                where cmd
                 where cargo
                 where rustc
                 cargo --version
