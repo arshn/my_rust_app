@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        PATH = "C:\\Rust-Jenkins\\.cargo\\bin;C:\\Rust-Jenkins\\.rustup\\toolchains\\stable-x86_64-pc-windows-msvc\\bin;${env.PATH}"
+        PATH = "C:\\Windows\\System32;C:\\Rust-Jenkins\\.cargo\\bin;C:\\Rust-Jenkins\\.cargo\\bin;C:\\Rust-Jenkins\\.rustup\\toolchains\\stable-x86_64-pc-windows-msvc\\bin;${env.PATH}"
     }
 
     stages {
