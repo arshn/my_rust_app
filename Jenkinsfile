@@ -2,27 +2,17 @@ pipeline {
     agent any
 
     environment {
-        // مهم: System32 حتما باید باشه
-        PATH = "C:\\Windows\\System32;C:\\Users\\arshn\\.cargo\\bin;${env.PATH}"
+        PATH = "C:\\Rust-Jenkins\\.cargo\\bin;C:\\Rust-Jenkins\\.rustup\\toolchains\\stable-x86_64-pc-windows-msvc\\bin;${env.PATH}"
     }
 
     stages {
 
-        stage('Fix Rust Toolchain') {
-            steps {
-                bat '''
-                rustup default stable
-                '''
-            }
-        }
-
         stage('Rust Debug') {
             steps {
                 bat '''
-                where cmd
+                echo PATH=%PATH%
                 where cargo
                 where rustc
-
                 cargo --version
                 rustc --version
                 '''
